@@ -48,8 +48,9 @@ struct RenewalRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(renewal.name)
-                        .font(.body.monospaced().weight(.semibold))
+                        .font(Self.nameFont)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .truncationMode(.middle)
                     if renewal.autoRenew { BorderedTag(text: "自动续费", tint: .green) }
                 }
@@ -68,6 +69,13 @@ struct RenewalRow: View {
         }
         .padding(.vertical, 2)
     }
+
+    // iPhone 竖屏上等宽 body 字号放不下常见长度的域名（CI 截图里 example-blog.com 被截断）。
+    #if os(iOS)
+    private static let nameFont = Font.callout.monospaced().weight(.semibold)
+    #else
+    private static let nameFont = Font.body.monospaced().weight(.semibold)
+    #endif
 
     private var subtitle: String {
         var parts = [renewal.platform, renewal.kind.title, Calendar.iso(renewal.dueDate)]

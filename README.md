@@ -68,7 +68,21 @@ scripts/check.sh                # 测试 + 不签名编译两个平台，日志�
 - **SMTP 只支持 465 端口的 SSL 直连**，不支持 587 端口的 STARTTLS。
 - 不连接各注册商的 API，到期日需要手动录入或批量导入。
 
+## CI
+
+每次推送，GitHub Actions（`.github/workflows/ci.yml`，macOS 15 + 最新稳定版 Xcode）会：
+
+1. 跑 `LedgerCore` 测试；
+2. 不签名编译 macOS 和 iOS 两个目标（`ENABLE_CLOUDKIT=NO`）；
+3. 用 `-seedSamples` 在 iOS 模拟器和 Mac 上启动 App，25 秒后检查进程还在、截图；
+4. 把截图、运行日志和编译警告推到 `ci-artifacts` 分支（只保留最近一次）。
+
+### `ENABLE_CLOUDKIT`
+
+没有 iCloud 权限的构建（未签名、免费开发者账号）用 CloudKit 时，App 会在启动时直接崩溃，不会抛错。所以这个开关在构建时决定：默认 `YES`；CI 和 `scripts/check.sh` 传 `NO`，这时只存本机，设置页会提示「iCloud 同步未启用」。
+
 ## 当前状态（2026-10-20）
 
-- 代码在没有 Swift 工具链的 Linux 容器里写成，**尚未在 Mac 上编译过**。第一次运行 `scripts/check.sh` 可能会有少量编译错误，把 `build/check.log` 末尾贴回来即可修。
+- CI 全部通过：17 个核心测试；两个平台编译无警告；iOS 模拟器（浅色、深色）和 Mac 上启动正常，示例数据显示正确。
+- 还没有在签名、开 iCloud 的真机上验证同步，也还没实测发出邮件。
 - 待确定：App 图标、正式名称。
