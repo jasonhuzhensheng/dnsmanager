@@ -42,7 +42,7 @@ struct DNSManagerApp: App {
     @State private var appState = AppState()
     @Environment(\.scenePhase) private var scenePhase
 
-    static let refreshTaskID = "com.jasonhu.dnsmanager.refresh"
+    nonisolated static let refreshTaskID = "com.jasonhu.dnsmanager.refresh"
 
     init() {
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared

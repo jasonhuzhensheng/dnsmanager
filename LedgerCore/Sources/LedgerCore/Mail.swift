@@ -159,20 +159,16 @@ public final class NWLineTransport: SMTPTransport, @unchecked Sendable {
         let connection = self.connection
         let queue = self.queue
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            // 状态回调都在 queue 上串行执行，用这个标记保证只 resume 一次。
-            var resumed = false
+            // 连接状态会变化多次，只有第一次终态 resume。
+            let once = OnceFlag()
             connection.stateUpdateHandler = { state in
-                guard !resumed else { return }
                 switch state {
                 case .ready:
-                    resumed = true
-                    cont.resume()
+                    if once.claim() { cont.resume() }
                 case .failed(let error), .waiting(let error):
-                    resumed = true
-                    cont.resume(throwing: SMTPError.connection(error.localizedDescription))
+                    if once.claim() { cont.resume(throwing: SMTPError.connection(error.localizedDescription)) }
                 case .cancelled:
-                    resumed = true
-                    cont.resume(throwing: SMTPError.timeout)
+                    if once.claim() { cont.resume(throwing: SMTPError.timeout) }
                 default:
                     break
                 }
@@ -225,6 +221,20 @@ public final class NWLineTransport: SMTPTransport, @unchecked Sendable {
 
     public func close() {
         connection.cancel()
+    }
+}
+
+private final class OnceFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimed = false
+
+    /// 第一次调用返回 true，之后都返回 false。
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if claimed { return false }
+        claimed = true
+        return true
     }
 }
 

@@ -38,7 +38,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project DNSManager.xcodeproj -scheme DNSManager-macOS -destination 'platform=macOS' \
-            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO build | tee build-macos.log | grep -E "error:|warning:|BUILD" || true
+            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO ENABLE_CLOUDKIT=NO build | tee build-macos.log | grep -E "error:|warning:|BUILD" || true
           grep -q "BUILD SUCCEEDED" build-macos.log
 
       - name: Pick iOS simulator
@@ -53,7 +53,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project DNSManager.xcodeproj -scheme DNSManager-iOS -destination "id=${{ steps.sim.outputs.udid }}" \
-            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO build | tee build-ios.log | grep -E "error:|warning:|BUILD" || true
+            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO ENABLE_CLOUDKIT=NO build | tee build-ios.log | grep -E "error:|warning:|BUILD" || true
           grep -q "BUILD SUCCEEDED" build-ios.log
 
       - name: Launch on iOS simulator

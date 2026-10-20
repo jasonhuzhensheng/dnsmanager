@@ -16,7 +16,7 @@ for target in DNSManager-macOS DNSManager-iOS; do
   if [[ "$target" == *iOS ]]; then dest='generic/platform=iOS Simulator'; else dest='platform=macOS'; fi
   echo "== 编译 $target" | tee -a "$log"
   xcodebuild -project DNSManager.xcodeproj -scheme "$target" -destination "$dest" \
-    -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build 2>&1 \
+    -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO ENABLE_CLOUDKIT=NO build 2>&1 \
     | tee -a "$log" | grep -E "error:|warning: .*(deprecated|unavailable)|BUILD (SUCCEEDED|FAILED)" || true
 done
 echo "完整日志：$log"
