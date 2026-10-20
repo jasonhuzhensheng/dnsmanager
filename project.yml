@@ -1,0 +1,76 @@
+# XcodeGen 工程描述。生成：scripts/bootstrap.sh（会装 xcodegen 并写入开发者团队 ID）。
+name: DNSManager
+options:
+  bundleIdPrefix: com.jasonhu
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    PRODUCT_NAME: DNSManager
+    PRODUCT_BUNDLE_IDENTIFIER: com.jasonhu.dnsmanager
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+packages:
+  LedgerCore:
+    path: LedgerCore
+targets:
+  DNSManager-iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: LedgerCore
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: Generated/iOS/Info.plist
+      properties:
+        CFBundleDisplayName: DNS Manager
+        UILaunchScreen: {}
+        UIBackgroundModes: [fetch, remote-notification]
+        BGTaskSchedulerPermittedIdentifiers: [com.jasonhu.dnsmanager.refresh]
+        ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    entitlements:
+      path: Generated/iOS/DNSManager.entitlements
+      properties:
+        aps-environment: development
+        com.apple.developer.icloud-container-identifiers: [iCloud.com.jasonhu.dnsmanager]
+        com.apple.developer.icloud-services: [CloudKit]
+    scheme: {}
+
+  DNSManager-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    dependencies:
+      - package: LedgerCore
+    info:
+      path: Generated/macOS/Info.plist
+      properties:
+        CFBundleDisplayName: DNS Manager
+        LSApplicationCategoryType: public.app-category.productivity
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Generated/macOS/DNSManager.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        # SMTP 发信
+        com.apple.security.network.client: true
+        com.apple.developer.aps-environment: development
+        com.apple.developer.icloud-container-identifiers: [iCloud.com.jasonhu.dnsmanager]
+        com.apple.developer.icloud-services: [CloudKit]
+    scheme: {}

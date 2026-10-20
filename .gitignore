@@ -1,0 +1,9 @@
+.DS_Store
+*.xcodeproj/
+Generated/
+build/
+.build/
+.swiftpm/
+LedgerCore/.build/
+xcuserdata/
+.team-id
