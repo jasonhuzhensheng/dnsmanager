@@ -25,6 +25,11 @@ final class AppState {
         #if os(macOS)
         email = EmailReminder(container: container)
         #endif
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-seedSamples") {
+            SampleData.insertIfEmpty(into: container.mainContext)
+        }
+        #endif
     }
 
     func rescheduleNotifications() async {

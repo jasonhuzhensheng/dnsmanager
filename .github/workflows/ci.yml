@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-15
@@ -57,20 +60,26 @@ jobs:
         run: |
           udid=${{ steps.sim.outputs.udid }}
           xcrun simctl boot "$udid" || true
-          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl bootstatus "$udid" -b > /dev/null
+          xcrun simctl ui "$udid" appearance light
           xcrun simctl install "$udid" build/DD/Build/Products/Debug-iphonesimulator/DNSManager.app
-          xcrun simctl launch "$udid" com.jasonhu.dnsmanager
-          sleep 20
-          xcrun simctl io "$udid" screenshot ios.png
-          # 进程还在说明启动后没有崩溃。
-          xcrun simctl spawn "$udid" launchctl list | grep -i dnsmanager
+          out=$(xcrun simctl launch --stdout="$PWD/ios-run.log" --stderr="$PWD/ios-run.log" "$udid" com.jasonhu.dnsmanager -seedSamples)
+          echo "$out"
+          pid=${out##*: }
+          sleep 25
+          xcrun simctl io "$udid" screenshot ios-1-launch.png
+          # 模拟器里的 App 就是宿主机上的一个进程，进程号还在说明没有崩溃。
+          if ps -p "$pid" > /dev/null; then echo "iOS app still running"; else echo "iOS app exited"; cat ios-run.log; exit 1; fi
+          xcrun simctl ui "$udid" appearance dark
+          sleep 3
+          xcrun simctl io "$udid" screenshot ios-2-dark.png
 
       - name: Launch on macOS
         run: |
           app=build/DD/Build/Products/Debug/DNSManager.app
-          "$app/Contents/MacOS/DNSManager" > macos-run.log 2>&1 &
+          "$app/Contents/MacOS/DNSManager" -seedSamples > macos-run.log 2>&1 &
           pid=$!
-          sleep 20
+          sleep 25
           screencapture -x macos.png || true
           if kill -0 "$pid"; then echo "macOS app still running"; kill "$pid"; else echo "macOS app exited"; cat macos-run.log; exit 1; fi
 
@@ -79,7 +88,20 @@ jobs:
         run: |
           ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
           for f in $(ls -t ~/Library/Logs/DiagnosticReports/*DNSManager* 2>/dev/null | head -2); do head -120 "$f"; done
-          tail -50 macos-run.log 2>/dev/null || true
+          tail -50 ios-run.log macos-run.log 2>/dev/null || true
+
+      # 编写环境下载不了 Actions 产物，把截图和诊断推到 ci-artifacts 分支，用 git 取回。
+      - name: Publish screenshots and diagnostics
+        if: always()
+        run: |
+          out=$(mktemp -d)
+          cp *.png ios-run.log macos-run.log "$out"/ 2>/dev/null || true
+          grep -hE "(error|warning):" build-macos.log build-ios.log 2>/dev/null | sed "s|$PWD/||" | sort -u > "$out/diagnostics.txt" || true
+          cd "$out"
+          git init -q -b ci-artifacts
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "CI ${GITHUB_SHA::7} run ${GITHUB_RUN_ID}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-artifacts
 
       - uses: actions/upload-artifact@v4
         if: always()
