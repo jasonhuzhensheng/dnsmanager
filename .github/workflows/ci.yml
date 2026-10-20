@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Tool versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: LedgerCore tests
+        working-directory: LedgerCore
+        run: swift test
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          DEVELOPMENT_TEAM="" xcodegen generate
+
+      # CI 上不签名：没有 iCloud 权限，App 会走「退回本地存储」那条路径，正好一起验证。
+      - name: Build macOS
+        run: |
+          set -o pipefail
+          xcodebuild -project DNSManager.xcodeproj -scheme DNSManager-macOS -destination 'platform=macOS' \
+            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO build | tee build-macos.log | grep -E "error:|warning:|BUILD" || true
+          grep -q "BUILD SUCCEEDED" build-macos.log
+
+      - name: Pick iOS simulator
+        id: sim
+        run: |
+          udid=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))][0].udid')
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available | grep "$udid"
+
+      - name: Build iOS (simulator)
+        run: |
+          set -o pipefail
+          xcodebuild -project DNSManager.xcodeproj -scheme DNSManager-iOS -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO build | tee build-ios.log | grep -E "error:|warning:|BUILD" || true
+          grep -q "BUILD SUCCEEDED" build-ios.log
+
+      - name: Launch on iOS simulator
+        run: |
+          udid=${{ steps.sim.outputs.udid }}
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" build/DD/Build/Products/Debug-iphonesimulator/DNSManager.app
+          xcrun simctl launch "$udid" com.jasonhu.dnsmanager
+          sleep 20
+          xcrun simctl io "$udid" screenshot ios.png
+          # 进程还在说明启动后没有崩溃。
+          xcrun simctl spawn "$udid" launchctl list | grep -i dnsmanager
+
+      - name: Launch on macOS
+        run: |
+          app=build/DD/Build/Products/Debug/DNSManager.app
+          "$app/Contents/MacOS/DNSManager" > macos-run.log 2>&1 &
+          pid=$!
+          sleep 20
+          screencapture -x macos.png || true
+          if kill -0 "$pid"; then echo "macOS app still running"; kill "$pid"; else echo "macOS app exited"; cat macos-run.log; exit 1; fi
+
+      - name: Crash logs
+        if: failure()
+        run: |
+          ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
+          for f in $(ls -t ~/Library/Logs/DiagnosticReports/*DNSManager* 2>/dev/null | head -2); do head -120 "$f"; done
+          tail -50 macos-run.log 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-and-logs
+          path: |
+            *.png
+            *.log
+          if-no-files-found: ignore
